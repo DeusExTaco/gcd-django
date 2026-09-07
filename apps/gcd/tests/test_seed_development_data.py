@@ -20,12 +20,21 @@ from apps.gcd.models import (
     Universe,
 )
 from apps.indexer.models import Indexer
-from apps.oi.models import ChangesetComment
+from apps.oi import states
+from apps.oi.models import ChangesetComment, SeriesRevision
 from apps.stats.models import CountStats
 
 
 def test_seed_development_data_is_idempotent_and_initializes_stats(db):
     """Contributors can rerun setup without duplicating accounts or statistics."""
+    call_command('seed_development_data')
+
+    seeded_comment = ChangesetComment.objects.get(text__contains='[GCD DEV]')
+    legacy_changeset = seeded_comment.changeset
+    legacy_changeset.seriesrevisions.all().delete()
+    legacy_changeset.approver = None
+    legacy_changeset.save(update_fields=['approver'])
+
     call_command('seed_development_data')
     call_command('seed_development_data')
 
@@ -54,4 +63,10 @@ def test_seed_development_data_is_idempotent_and_initializes_stats(db):
     assert Image.objects.filter(object_id__in=(issue.id, variant.id)).exclude(
         image_file=''
     ).count() == 2
-    assert ChangesetComment.objects.filter(text__contains='[GCD DEV]').count() == 1
+    comment = ChangesetComment.objects.get(text__contains='[GCD DEV]')
+    changeset = comment.changeset
+    assert changeset.state == states.APPROVED
+    assert changeset.approver.username == 'admin'
+    assert SeriesRevision.objects.filter(
+        changeset=changeset, series=series
+    ).count() == 1

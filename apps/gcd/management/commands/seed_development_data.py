@@ -34,7 +34,12 @@ from apps.gcd.models import (
     Universe,
 )
 from apps.oi import states
-from apps.oi.models import CTYPES, Changeset, ChangesetComment
+from apps.oi.models import (
+    CTYPES,
+    Changeset,
+    ChangesetComment,
+    SeriesRevision,
+)
 from apps.stddata.models import Country, Language, Script
 from apps.stats.models import CountStats
 
@@ -324,20 +329,33 @@ class Command(BaseCommand):
         publisher.save(update_fields=['issue_count', 'series_count'])
 
     def _seed_change_history(self):
-        """Create one approved changeset and emoji-bearing comment sample."""
+        """Create one approved series revision with a sample comment."""
         admin = User.objects.get(username='admin')
-        comment = ChangesetComment.objects.filter(text=SAMPLE_COMMENT).first()
+        comment = ChangesetComment.objects.filter(
+            text=SAMPLE_COMMENT
+        ).select_related('changeset').first()
         if comment:
-            return
-        changeset = Changeset.objects.create(
-            state=states.APPROVED,
-            indexer=admin,
-            change_type=CTYPES['series'],
-        )
-        ChangesetComment.objects.create(
-            commenter=admin,
-            changeset=changeset,
-            text=SAMPLE_COMMENT,
-            old_state=states.PENDING,
-            new_state=states.APPROVED,
-        )
+            changeset = comment.changeset
+            if changeset.approver_id is None:
+                changeset.approver = admin
+                changeset.save(update_fields=['approver'])
+        else:
+            changeset = Changeset.objects.create(
+                state=states.APPROVED,
+                indexer=admin,
+                approver=admin,
+                change_type=CTYPES['series'],
+            )
+            ChangesetComment.objects.create(
+                commenter=admin,
+                changeset=changeset,
+                text=SAMPLE_COMMENT,
+                old_state=states.PENDING,
+                new_state=states.APPROVED,
+            )
+
+        series = Series.objects.get(name=f'{SAMPLE_PREFIX} Adventures')
+        if not changeset.seriesrevisions.filter(series=series).exists():
+            revision = SeriesRevision.clone(series, changeset, fork=True)
+            revision.source = series
+            revision.save()

@@ -5,6 +5,7 @@
 
 from importlib import import_module
 
+import pytest
 from django.db import connection, migrations
 
 from apps.oi.forms.support import _get_comments_form_field
@@ -56,6 +57,10 @@ def test_comment_charset_migration_requires_online_ddl():
     assert 'LOCK=NONE' in operation.sql
 
 
+@pytest.mark.skipif(
+    connection.vendor != 'mysql',
+    reason='The online DDL probe requires MySQL.',
+)
 def test_comment_charset_migration_runs_online_on_legacy_mysql_column(db):
     """The online DDL works when converting a legacy utf8mb3 column."""
     migration_module = import_module(

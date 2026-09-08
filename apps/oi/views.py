@@ -582,8 +582,8 @@ def submit(request, id):
             comment = ''
         compare_url = settings.SITE_URL.rstrip('/') + urlresolvers.reverse(
           'compare', kwargs={'id': changeset.id})
-        if (hasattr(changeset.approver, 'indexer') and
-                changeset.approver.indexer.collapse_compare_view):
+        approver_indexer = getattr(changeset.approver, 'indexer', None)
+        if approver_indexer and approver_indexer.collapse_compare_view:
             # The compare route currently has no query parameters. If any are
             # added later, merge this parameter instead of appending another ?.
             compare_url += '?collapse=1'

@@ -36,6 +36,14 @@ def test_seed_development_data_is_idempotent_and_initializes_stats(db):
     legacy_changeset.save(update_fields=['approver'])
 
     call_command('seed_development_data')
+
+    repaired_series = Series.objects.get(name='[GCD DEV] Adventures')
+    repaired_revision = SeriesRevision.objects.get(
+        changeset=legacy_changeset, series=repaired_series
+    )
+    assert repaired_revision.created == repaired_series.modified
+    revision_created = repaired_revision.created
+
     call_command('seed_development_data')
 
     assert User.objects.filter(username='admin').count() == 1
@@ -67,6 +75,7 @@ def test_seed_development_data_is_idempotent_and_initializes_stats(db):
     changeset = comment.changeset
     assert changeset.state == states.APPROVED
     assert changeset.approver.username == 'admin'
-    assert SeriesRevision.objects.filter(
+    revision = SeriesRevision.objects.get(
         changeset=changeset, series=series
-    ).count() == 1
+    )
+    assert revision.created == revision_created

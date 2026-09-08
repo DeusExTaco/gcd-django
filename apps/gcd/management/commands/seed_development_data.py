@@ -358,4 +358,5 @@ class Command(BaseCommand):
         if not changeset.seriesrevisions.filter(series=series).exists():
             revision = SeriesRevision.clone(series, changeset, fork=True)
             revision.source = series
+            revision.created = series.modified
             revision.save()
